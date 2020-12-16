@@ -1,0 +1,63 @@
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+// Delete all loaded videos from channel [String] -> 'bad_channel'
+async function remove_liked(bad_channel) {
+	const icon_index_start = 9;
+    const title_index_start = 2;
+	const num_loaded_items = document.querySelectorAll('yt-icon-button').length - 12;
+	
+	var total_removed_videos = 0;
+    
+    for(let i = 0; i < num_loaded_items; i++) {
+		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9].title;
+		if(bad_video_check === '[Private video]' || bad_video_check === '[Deleted video]') {
+			console.log(`Bad video of type ${bad_video_check} detected at index [${i + 1}]`);
+			return;
+		}
+		
+		let title = document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[i + title_index_start].innerText;
+		if(title === bad_channel) {
+			let dropdown_btn = document.querySelectorAll('yt-icon-button')[i + icon_index_start];
+			dropdown_btn.click();
+			
+			await sleep(500);
+			
+			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[3];
+			remove_btn.click();
+			
+			console.log(`[${i + 1}] Removed video by channel ${title}`);
+			total_removed_videos += 1;
+		}
+	}
+	console.log(`Removed a total of ${total_removed_videos} videos after going through ${num_loaded_items} loaded videos. Please refresh to see the results.`);
+}
+
+// Delete all loaded private or deleted videos from playlist
+async function clean_playlist() {
+	const icon_index_start = 9;
+    const title_index_start = 2;
+	const num_loaded_items = document.querySelectorAll('yt-icon-button').length - 12;
+	
+	var total_removed_videos = 0;
+    
+    for(let i = 0; i < num_loaded_items; i++) {
+		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9].title;
+		if(bad_video_check === '[Private video]' || bad_video_check === '[Deleted video]') {
+			let dropdown_btn = document.querySelectorAll('yt-icon-button')[i + icon_index_start];
+			dropdown_btn.click();
+			
+			await sleep(500);
+			
+			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[0];
+			remove_btn.click();
+			
+			console.log(`Removed bad video of type ${bad_video_check} detected at index [${i + 1}]`);
+			total_removed_videos += 1;
+		}
+		// console.log(`Skipping [${i}]`);
+	}
+	console.log(`Removed a total of ${total_removed_videos} videos after going through ${num_loaded_items} loaded videos. Please refresh to see the results.`);
+}
