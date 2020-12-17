@@ -1,3 +1,17 @@
+async function run_all() {
+	await load_all();
+	await clean_playlist();
+	await location.reload();
+	await load_all();
+	const user_input = await window.prompt("Input channel name to filter out.", "");
+	if(user_input !== null) {
+		await remove_video(user_input.split(','));
+	} else {
+		await get_unique_channels();
+	}
+	alert("Finished.");
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -13,61 +27,70 @@ async function scroll_down() {
 		let prev_height = document.querySelectorAll('ytd-app')[0].offsetHeight;
 		let curr_height = prev_height;
 		
-		console.log(`[${i + 1}] Loading...`);
 		while(prev_height === curr_height) {
 			window.scrollTo(0, curr_height);
 			await sleep(500);
 			curr_height = document.querySelectorAll('ytd-app')[0].offsetHeight;
+			if(i === num_loads - 1) return;
 		}
 	}
 }
 
 // Only run load_all() when devtools isn't open (devtools makes loading very slow)
-function load_all() {
+async function load_all() {
 	var element = new Image;
 	var devtoolsOpen = false;
 	element.__defineGetter__("id", function() {
 		devtoolsOpen = true; // This only executes when devtools is open.
 	});
-	var tid = setInterval(function() {
+	
+	let loop = true;
+	while(loop) {
 		devtoolsOpen = false;
 		console.log(element);
 		console.clear();
 		if(!devtoolsOpen) {
-			clearInterval(tid);
+			loop = false;
 			console.log(`Devtools closed. Starting loading process...`);
-			scroll_down();
+			await scroll_down();
 		}
-	}, 1000);
+		await sleep(1000);
+	}
 }
 
 
 // Delete all loaded videos from channel [String] -> 'bad_channel'
-async function remove_liked(bad_channel) {
-	const icon_index_start = 9;
-    const title_index_start = 2;
-	const num_loaded_items = document.querySelectorAll('yt-icon-button').length - 12;
+async function remove_video(bad_channels) {
+	const is_liked_playlist = (document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[0].innerText === 'Liked videos');
+	const title_index_start = (is_liked_playlist) ? 2 : 1;
+	const icon_index_start = (is_liked_playlist) ? 9 : 11;
+	const remove_btn_index = (is_liked_playlist) ? 3 : 0;
+	
+	let num_loaded_items = document.querySelectorAll('yt-icon-button').length;
+	(is_liked_playlist) ? num_loaded_items -= 12 : num_loaded_items -= 9;
 	
 	var total_removed_videos = 0;
     
     for(let i = 0; i < num_loaded_items; i++) {
-		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9].title;
-		if(bad_video_check === '[Private video]' || bad_video_check === '[Deleted video]') {
+		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9];
+		if(bad_video_check !== undefined && (bad_video_check.title === '[Private video]' || bad_video_check.title === '[Deleted video]')) {
 			console.log(`Bad video of type ${bad_video_check} detected at index [${i + 1}]`);
 			return;
 		}
 		
-		let title = document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[i + title_index_start].innerText;
-		if(title === bad_channel) {
+		let title = document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[i + title_index_start];
+		if(title !== undefined && bad_channels.includes(title.innerText)) {
 			let dropdown_btn = document.querySelectorAll('yt-icon-button')[i + icon_index_start];
 			dropdown_btn.click();
 			
 			await sleep(500);
 			
-			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[3];
+			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[remove_btn_index];
 			remove_btn.click();
 			
-			console.log(`[${i + 1}] Removed video by channel ${title}`);
+			let description = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[7 + 16 * i];
+			(description !== undefined) ? description = description.innerText : description = "unavailable";
+			console.log(`[${i + 1}] Removed video "${description.trim()}" by channel ${title.innerText}`);
 			total_removed_videos += 1;
 		}
 	}
@@ -76,22 +99,26 @@ async function remove_liked(bad_channel) {
 
 // Delete all loaded private or deleted videos from playlist
 async function clean_playlist() {
-	const icon_index_start = 9;
-    const title_index_start = 2;
-	const num_loaded_items = document.querySelectorAll('yt-icon-button').length - 12;
+	const is_liked_playlist = (document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[0].innerText === 'Liked videos');
+	const title_index_start = (is_liked_playlist) ? 2 : 1;
+	const icon_index_start = (is_liked_playlist) ? 9 : 11;
+	const remove_btn_index = (is_liked_playlist) ? 0 : 3;
+	
+	let num_loaded_items = document.querySelectorAll('yt-icon-button').length;
+	(is_liked_playlist) ? num_loaded_items -= 12 : num_loaded_items -= 9;
 	
 	var total_removed_videos = 0;
     
     for(let i = 0; i < num_loaded_items; i++) {
-		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9].title;
-		if(bad_video_check === '[Private video]' || bad_video_check === '[Deleted video]') {
+		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9];
+		if(bad_video_check !== undefined && (bad_video_check.title === '[Private video]' || bad_video_check.title === '[Deleted video]')) {
 			let dropdown_btn = document.querySelectorAll('yt-icon-button')[i + icon_index_start];
 			dropdown_btn.click();
 			
 			await sleep(500);
 			
-			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[0];
-			remove_btn.click();
+			let remove_btn = document.querySelectorAll('ytd-menu-service-item-renderer')[remove_btn_index];
+			if(remove_btn.firstElementChild.lastElementChild.innerText.split(" ")[0] === "Remove") remove_btn.click();
 			
 			console.log(`Removed bad video of type ${bad_video_check} detected at index [${i + 1}]`);
 			total_removed_videos += 1;
@@ -99,4 +126,37 @@ async function clean_playlist() {
 		// console.log(`Skipping [${i}]`);
 	}
 	console.log(`Removed a total of ${total_removed_videos} videos after going through ${num_loaded_items} loaded videos. Please refresh to see the results.`);
+}
+
+// Get list of unique channels in playlist
+async function get_unique_channels() {
+	const is_liked_playlist = (document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[0].innerText === 'Liked videos');
+	const title_index_start = (is_liked_playlist) ? 2 : 1;
+	const icon_index_start = (is_liked_playlist) ? 9 : 11;
+	const remove_btn_index = (is_liked_playlist) ? 0 : 3;
+	
+	let num_loaded_items = document.querySelectorAll('yt-icon-button').length;
+	(is_liked_playlist) ? num_loaded_items -= 12 : num_loaded_items -= 9;
+	
+	var total_removed_videos = 0;
+	var unique_channels = {};
+    
+    for(let i = 0; i < num_loaded_items; i++) {
+		let bad_video_check = document.getElementsByClassName('style-scope ytd-playlist-video-renderer')[16 * i + 9];
+		if(bad_video_check !== undefined && (bad_video_check.title === '[Private video]' || bad_video_check.title === '[Deleted video]')) {
+			console.log(`Bad video of type ${bad_video_check} detected at index [${i + 1}]`);
+			return;
+		}
+		
+		let title = document.getElementsByClassName('yt-simple-endpoint style-scope yt-formatted-string')[i + title_index_start];
+		if(title !== undefined) {
+			unique_channels[title.innerText] = (unique_channels[title.innerText] === undefined) ? 1 : unique_channels[title.innerText] + 1;
+		}
+	}
+	console.log(`Found ${Object.keys(unique_channels).length} unique channels. Listing them...`);
+	const sorted_channels = Object.keys(unique_channels).sort(function (a, b) { return unique_channels[b] - unique_channels[a]; });
+	const threshold = 3;
+	for(let entry of sorted_channels) {
+		if(unique_channels[entry] >= threshold) console.log(`${entry}: ${unique_channels[entry]} times.`);
+	}
 }
