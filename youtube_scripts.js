@@ -25,7 +25,11 @@ async function scroll_down() {
 			window.scrollTo(0, curr_height);
 			await sleep(500);
 			curr_height = document.querySelectorAll('ytd-app')[0].offsetHeight;
-			if(i === num_loads - 1) return;
+			if(i === num_loads - 1) {
+				window.scrollTo(0, curr_height); 
+				console.log(`Completed loads. Exiting scroll function...`);
+				return;
+			}
 		}
 	}
 }
@@ -165,4 +169,24 @@ async function get_unique_channels() {
 	for(let entry of sorted_channels) {
 		if(unique_channels[entry] >= threshold) console.log(`${entry}: ${unique_channels[entry]} times.`);
 	}
+}
+
+async function print_titles() {
+	await load_all();
+	console.clear();
+	
+	const items = document.getElementsByClassName('style-scope ytd-playlist-video-renderer');
+	let index = 1;
+	let saved_string = `[CURRENT DATE]: ${new Date()}\n`;
+	
+	if(items !== undefined || items !== null) {
+		for(let i = 0; i < items.length; i++) {
+			if(items[i] !== undefined && items[i].hasAttribute('title') && items[i].title !== undefined) {
+				saved_string += `[${index++}] ${items[i].title}\n`;
+			}
+		}
+	} else {
+		console.log(`ERROR: Tried to find items, but got ${items}`);
+	}
+	console.log(saved_string);
 }
